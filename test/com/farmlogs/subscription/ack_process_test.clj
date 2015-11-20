@@ -35,7 +35,25 @@
       (a/>!! result-chan (send-result :ack))
       (a/close! input)
       (is (= [:ack :foo] (take-with-timeout output 10)))
-      (is (closed? ack-process))))
+      (is (nil? (a/<!! ack-process)))))
+
+  (testing "Messages get the correct acknowledgement."
+    (let [input (a/chan 1)
+          ack-process (ack-process input nil)
+          output (a/chan 1)
+          send-result (partial result output)
+          result-chan1 (a/chan 1)
+          result-chan2 (a/chan 1)]
+
+      (a/>!! input [result-chan1 :foo])
+      (a/>!! input [result-chan2 :bar])
+      (a/>!! result-chan1 (send-result :ack))
+      (a/>!! result-chan2 (send-result :nack))
+      (a/close! input)
+      (is (nil? (a/<!! ack-process)))
+      (a/close! output)
+      (is (= #{[:ack :foo] [:nack :bar]}
+             (a/<!! (a/into #{} output))))))
 
   (testing "All messages get ack'd even if ack input closes before worker result."
     (let [input (a/chan 1)
@@ -46,10 +64,10 @@
 
       (a/>!! input [result-chan :foo])
       (a/close! input)
-      (is (not (closed? ack-process)))
+      (is (= ::timeout (take-with-timeout ack-process 10)))
       (a/>!! result-chan (send-result :ack))
       (is (= [:ack :foo] (take-with-timeout output 10)))
-      (is (closed? ack-process))))
+      (is (nil? (a/<!! ack-process)))))
 
   (testing "Ack process keeps working if there's an exception in WorkerResult."
     (let [input (a/chan 1)
@@ -62,8 +80,8 @@
       (a/>!! input [result-chan1 :foo])
       (a/>!! input [result-chan2 :bar])
       (a/close! input)
-      (is (not (closed? ack-process)))
+      (is (= ::timeout (take-with-timeout ack-process 10)))
       (a/>!! result-chan2 (broken-result))
       (a/>!! result-chan1 (send-result :ack))
       (is (= [:ack :foo] (take-with-timeout output 10)))
-      (is (closed? ack-process)))))
+      (is (nil? (a/<!! ack-process))))))
