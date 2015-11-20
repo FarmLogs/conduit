@@ -22,15 +22,15 @@
                          (not (:redelivery? msg))))))
 
 (defn ack-process
-  "Given a channel, start the message acknowledgement process. Return
-  a channel that closes when the ack process terminates. The
-  acknowledgement process can be shut down by closing
-  new-messages-chan. Once all pending messages have finished the
-  process will stop.
+  "Given a core.async channel and an RMQ channel, start the message
+  acknowledgement process. Return a channel that closes when the ack
+  process terminates. The acknowledgement process can be shut down by
+  closing new-messages-chan. Once all pending messages have finished
+  the process will stop.
 
    - new-messages-chan :: a core.async channel that conveys new
-                          messages into the ack process. Data on the
-                          ack channel is of the form
+                          messages into the ack process. Data on
+                          this channel is of the form
                           [result-chan msg-headers]."
   [new-messages-chan rmq-channel]
   (a/go-loop [pending {new-messages-chan ::nothing}]
