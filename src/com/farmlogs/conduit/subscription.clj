@@ -1,10 +1,10 @@
-(ns com.farmlogs.messaging.subscription
+(ns com.farmlogs.conduit.subscription
   (:require [com.stuartsierra.component :as component]
             [clojure.core.async :as a]
             [clojure.tools.logging :as log]
             [clojure.core.async.impl.protocols :as impl]
-            [com.farmlogs.messaging.subscription.ack-process :refer [ack-process]]
-            [com.farmlogs.messaging.payload :refer [read-payload]]
+            [com.farmlogs.conduit.subscription.ack-process :refer [ack-process]]
+            [com.farmlogs.conduit.payload :refer [read-payload]]
             [langohr
              [basic :as rmq.basic]
              [channel :as rmq.chan]
@@ -130,7 +130,7 @@
     (impl/take! pending-messages fn1-handler)))
 
 (comment
-  (do (require '[com.farmlogs.messaging.connection :as conn])
+  (do (require '[com.farmlogs.conduit.connection :as conn])
       (defrecord EchoWorker
           [subscription]
         component/Lifecycle
@@ -142,8 +142,8 @@
                               (loop []
                                 (let [[[result-chan msg :as event]] (a/alts! [ctrl-chan subscription])]
                                   (when-not (nil? event)
-                                    (println "msg:" msg)
-                                    (a/>! result-chan :ack)
+                                    ;(println "msg:" msg)
+                                    (a/put! result-chan :ack)
                                     (recur))))
                               (log/info "worker stopping")))))
         (stop [{:keys [ctrl-chan process] :as this}]

@@ -1,4 +1,4 @@
-(ns com.farmlogs.messaging)
+(ns com.farmlogs.conduit)
 
 (defn foo
   "I don't do a whole lot."

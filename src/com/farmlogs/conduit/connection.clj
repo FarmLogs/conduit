@@ -1,4 +1,4 @@
-(ns com.farmlogs.messaging.connection
+(ns com.farmlogs.conduit.connection
   (:require [com.stuartsierra.component :as component]
             [clojure.tools.logging :as log]
             [langohr.core :as rmq]))

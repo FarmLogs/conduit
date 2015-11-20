@@ -1,7 +1,7 @@
-(ns com.farmlogs.messaging.subscription.ack-process
+(ns com.farmlogs.conduit.subscription.ack-process
   (:require [clojure.core.async :as a]
             [langohr.basic      :as rmq]
-            [com.farmlogs.messaging.protocols :as p]
+            [com.farmlogs.conduit.protocols :as p]
             [clojure.tools.logging :as log]))
 
 (extend-protocol p/WorkerResult

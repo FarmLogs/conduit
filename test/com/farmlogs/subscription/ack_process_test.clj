@@ -1,9 +1,8 @@
-(ns com.farmlogs.messaging.subscription.ack-process-test
+(ns com.farmlogs.conduit.subscription.ack-process-test
   (:require [clojure.test :refer :all]
-            [com.farmlogs.messaging.subscription.ack-process :refer :all]
-            [com.farmlogs.messaging.protocols :as p]
-            [clojure.core.async :as a]
-            [clojure.core.async.impl.protocols :refer [closed?]]))
+            [com.farmlogs.conduit.subscription.ack-process :refer :all]
+            [com.farmlogs.conduit.protocols :as p]
+            [clojure.core.async :as a]))
 
 (defn result
   [output result]

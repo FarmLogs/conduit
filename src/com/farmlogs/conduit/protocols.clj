@@ -1,4 +1,4 @@
-(ns com.farmlogs.messaging.protocols)
+(ns com.farmlogs.conduit.protocols)
 
 (defprotocol WorkerResult
   (-respond! [this transport message-metadata]
