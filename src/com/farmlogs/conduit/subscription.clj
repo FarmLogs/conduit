@@ -115,7 +115,7 @@
     ;; wait for termination
     (a/<!! ack-process)
 
-    ;; All messages are drained, we can close the channel
+    ;; All messages are drained. We can close the RMQ channel.
     (rmq.chan/close rmq-chan)
     (log/info (format "Shut down subscription '%s' on queue '%s'"
                       consumer-tag
