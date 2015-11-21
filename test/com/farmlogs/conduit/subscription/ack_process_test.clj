@@ -72,7 +72,7 @@
   (testing "Ack process keeps working if there's an exception in WorkerResult."
     (let [input (a/chan 1)
           ack-process (ack-process input nil)
-          output (a/chan 1)
+          output (a/chan 2)
           send-result (partial result output)
           result-chan1 (a/chan 1)
           result-chan2 (a/chan 1)]
@@ -83,5 +83,6 @@
       (is (= ::timeout (take-with-timeout ack-process 10)))
       (a/>!! result-chan2 (broken-result))
       (a/>!! result-chan1 (send-result :ack))
-      (is (= [:ack :foo] (take-with-timeout output 10)))
-      (is (nil? (a/<!! ack-process))))))
+      (is (nil? (a/<!! ack-process)))
+      (a/close! output)
+      (is (= #{[:ack :foo]} (a/<!! (a/into #{} output)))))))
