@@ -17,21 +17,21 @@
   [new-message-chan pending-messages-chan]
   (fn [ch metadata ^bytes payload]
     (let [result-chan (a/chan 1)]
-      (when-not (a/>!! new-message-chan [result-chan metadata])
+      (if-not (a/>!! new-message-chan [result-chan metadata])
         (log/error "Failed to put message onto new-message-chan"
                    (pr-str {:payload (-> (Base64/getEncoder)
                                          (.encodeToString payload))
-                            :headers metadata})))
-      (try (when-not (a/>!! pending-messages-chan
-                            [result-chan (read-payload (:content-type metadata) payload)])
-             (a/>!! result-chan :retry))
-           (catch Throwable t
-             (log/error t (format (str "Exception while enqueuing"
-                                       " new message: '%s' content-type: %s")
-                                  (-> (Base64/getEncoder)
-                                      (.encodeToString payload))
-                                  (:content-type metadata)))
-             (a/>!! result-chan :nack))))))
+                            :headers metadata}))
+        (try (when-not (a/>!! pending-messages-chan
+                              [result-chan (read-payload (:content-type metadata) payload)])
+               (a/>!! result-chan :retry))
+             (catch Throwable t
+               (log/error t (format (str "Exception while enqueuing"
+                                         " new message: '%s' content-type: %s")
+                                    (-> (Base64/getEncoder)
+                                        (.encodeToString payload))
+                                    (:content-type metadata)))
+               (a/>!! result-chan :nack)))))))
 
 (defn consume-ok
   [{:keys [queue-name] :as config} consumer-tag]
