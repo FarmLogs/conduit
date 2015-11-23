@@ -26,26 +26,26 @@
                               [result-chan (read-payload (:content-type metadata) payload)])
                (a/>!! result-chan :retry))
              (catch Throwable t
-               (log/error t (format (str "Exception while enqueuing"
-                                         " new message: '%s' content-type: %s")
-                                    (-> (Base64/getEncoder)
-                                        (.encodeToString payload))
-                                    (:content-type metadata)))
+               (log/errorf t (str "Exception while enqueuing"
+                                  " new message: '%s' content-type: %s")
+                           (-> (Base64/getEncoder)
+                               (.encodeToString payload))
+                           (:content-type metadata))
                (a/>!! result-chan :nack)))))))
 
 (defn consume-ok
   [{:keys [queue-name] :as config} consumer-tag]
-  (log/info (format "Consuming %s with tag %s" queue-name consumer-tag)))
+  (log/infof "Consuming %s with tag %s" queue-name consumer-tag))
 
 (defn cancel
   [cancelled-promise {:keys [queue-name] :as queue-config} consumer-tag]
   (deliver cancelled-promise true)
-  (log/warn (format "Cancelled consumer tag: %s on queue: %s" consumer-tag queue-name)))
+  (log/warnf "Cancelled consumer tag: %s on queue: %s" consumer-tag queue-name))
 
 (defn cancel-ok
   [cancelled-promise {:keys [queue-name] :as queue-config} consumer-tag]
   (deliver cancelled-promise true)
-  (log/info (format "Consumer tag: %s on queue: %s shutdown" consumer-tag queue-name)))
+  (log/infof "Consumer tag: %s on queue: %s shutdown" consumer-tag queue-name))
 
 (defn- make-channel
   [conn {:keys [exchange-name exchange-type] :as config}]
@@ -59,7 +59,7 @@
     [rmq-connection rmq-chan queue-config buffer-size]
   component/Lifecycle
   (start [this]
-    (log/info (format "Starting subscription on queue '%s'" (:queue-name queue-config)))
+    (log/infof "Starting subscription on queue '%s'" (:queue-name queue-config))
     (let [rmq-chan (or rmq-chan (make-channel (:conn rmq-connection) queue-config))
           new-messages (a/chan)
           pending-messages (a/chan buffer-size)
@@ -74,9 +74,9 @@
 
 
 
-      (log/info (format "Started subscription on queue '%s' with tag '%s'"
-                        (:queue-name queue-config)
-                        consumer-tag))
+      (log/infof "Started subscription on queue '%s' with tag '%s'"
+                 (:queue-name queue-config)
+                 consumer-tag)
       (assoc this
              :rmq-chan rmq-chan
              :rmq-consumer rmq-consumer
@@ -91,9 +91,9 @@
     ;; library has turned off the workers depending on this subscription.
 
     ;; Shut down the RMQ consumer, so we don't get any more messages delivered
-    (log/info (format "Shutting down subscription '%s' on queue '%s'"
-                      consumer-tag
-                      (:queue-name queue-config)))
+    (log/infof "Shutting down subscription '%s' on queue '%s'"
+               consumer-tag
+               (:queue-name queue-config))
     (rmq.basic/cancel rmq-chan consumer-tag)
 
     ;; Wait until the server acknowledges the cancellation of our subscription
