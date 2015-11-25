@@ -58,7 +58,7 @@
 
       ;; Simulate workers finishing processing the messages
       (a/>!! result-chan1 (send-result :ack))
-      (a/>!! result-chan2 (send-result :nack))
+      (a/>!! result-chan2 (send-result :drop))
 
       ;; Begin shutdown sequence for the ack-process
       (a/close! input)
@@ -66,7 +66,7 @@
       (is (nil? (a/<!! ack-process))
           "The ack-process should be terminated.")
       (a/close! output)
-      (is (= #{[:ack :foo] [:nack :bar]}
+      (is (= #{[:ack :foo] [:drop :bar]}
              (a/<!! (a/into #{} output)))
           "We should ACK :foo and NACK :bar.")))
 

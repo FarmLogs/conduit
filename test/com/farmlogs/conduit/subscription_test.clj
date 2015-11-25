@@ -65,7 +65,7 @@
           "The ack-process was told to :retry the message.")))
 
   (testing (str "If we have an exception while enqueuing the message payload,"
-                " we tell the ack process to :nack the message.")
+                " we tell the ack process to :drop the message.")
     (let [new-message-chan (a/chan 1)
           pending-messages-chan (a/chan 1)
           metadata {:content-type "text/plain"}
@@ -84,5 +84,5 @@
 
       (is (nil? (a/<!! pending-messages-chan))
           "The message didn't get to the workers.")
-      (is (= :nack @result)
-          "The ack-process was told to :nack the message."))))
+      (is (= :drop @result)
+          "The ack-process was told to :drop the message."))))

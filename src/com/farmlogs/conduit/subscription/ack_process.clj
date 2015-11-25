@@ -7,17 +7,17 @@
 (extend-protocol p/WorkerResult
   nil
   (-respond! [_ transport msg]
-    (p/-respond! :nack transport msg))
+    (p/-respond! :drop transport msg))
 
   Object
   (-respond! [_ transport msg]
-    (p/-respond! :nack transport msg))
+    (p/-respond! :drop transport msg))
 
   clojure.lang.Keyword
   (-respond! [this transport {:keys [delivery-tag] :as msg}]
     (case this
       :ack (rmq/ack transport delivery-tag)
-      :nack (rmq/reject transport delivery-tag false)
+      :drop (rmq/reject transport delivery-tag false)
       :retry (rmq/reject transport delivery-tag
                          (not (:redelivery? msg))))))
 

@@ -31,7 +31,7 @@
                            (-> (Base64/getEncoder)
                                (.encodeToString payload))
                            (:content-type metadata))
-               (a/>!! result-chan :nack)))))))
+               (a/>!! result-chan :drop)))))))
 
 (defn consume-ok
   [{:keys [queue-name] :as config} consumer-tag]
