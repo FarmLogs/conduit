@@ -128,3 +128,18 @@
   impl/ReadPort
   (take! [{:keys [pending-messages]} fn1-handler]
     (impl/take! pending-messages fn1-handler)))
+
+(def ^:static +queue-config-required-keys+
+  #{:exchange-name :queue-name :exchange-type})
+
+(defn subscription
+  ([queue-config buffer-size]
+   (subscription nil queue-config buffer-size))
+  ([rmq-chan queue-config buffer-size]
+   (assert (clojure.set/subset? +queue-config-required-keys+
+                                queue-config))
+   (assert (number? buffer-size))
+   (when (= "topic" (:exchange-type queue-config))
+     (assert (not (nil? (:routing-key queue-config)))))
+
+   (->Subscription nil rmq-chan queue-config buffer-size)))

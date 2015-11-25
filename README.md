@@ -12,6 +12,7 @@ underlying messaging library.
 
 ```clojure
 (require '[com.farmlogs.conduit.connection :as conn])
+(require '[com.farmlogs.conduit.subscription :refer [subscription]])
 (require '[com.stuartsierra.component :as component])
 (require '[clojure.core.async :as a])
 
@@ -38,12 +39,11 @@ underlying messaging library.
 (def system
     (-> (component/system-map
          :rmq (conn/connection "amqp://guest:guest@localhost")
-         :subscription (component/using (map->Subscription {:queue-config
-                                                            {:exchange-name "foo"
-                                                             :queue-name "foo"
-                                                             :exchange-type "topic"
-                                                             :routing-key "*"}
-                                                            :buffer-size 1024})
+         :subscription (component/using (subscription {:exchange-name "foo"
+                                                       :queue-name "foo"
+                                                       :exchange-type "topic"
+                                                       :routing-key "*"}
+                                                      1024)
                                         {:rmq-connection :rmq})
          :worker (component/using (->LoggingWorker nil)
                                   [:subscription]))

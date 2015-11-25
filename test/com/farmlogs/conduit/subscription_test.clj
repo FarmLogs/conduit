@@ -17,7 +17,7 @@
           worker-input      (a/<!! pending-messages-chan)]
 
       (is (identical? (first ack-process-input) (first worker-input))
-          "The result-chan handed to Workers be handed to the ack-process.")
+          "The result-chan handed to Workers should be handed to the ack-process.")
       (is (identical? (second ack-process-input) metadata)
           "The ack-process should receive the message's metadata.")
       (is (= (second worker-input) (String. payload))
