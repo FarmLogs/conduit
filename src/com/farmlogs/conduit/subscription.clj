@@ -3,7 +3,7 @@
             [clojure.core.async :as a]
             [clojure.tools.logging :as log]
             [clojure.core.async.impl.protocols :as impl]
-            [com.farmlogs.conduit.subscription.ack-process :refer [ack-process]]
+            [com.farmlogs.conduit.subscription.ack-process :refer [->ack-process]]
             [com.farmlogs.conduit.payload :refer [read-payload]]
             [langohr
              [basic :as rmq.basic]
@@ -63,7 +63,7 @@
     (let [rmq-chan (or rmq-chan (make-channel (:conn rmq-connection) queue-config))
           new-messages (a/chan)
           pending-messages (a/chan buffer-size)
-          ack-process (ack-process new-messages buffer-size rmq-chan)
+          ack-process (->ack-process new-messages buffer-size rmq-chan)
           cancelled? (promise)
           rmq-consumer (rmq.consumer/create-default
                         rmq-chan

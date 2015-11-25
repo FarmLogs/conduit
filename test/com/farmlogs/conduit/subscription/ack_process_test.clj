@@ -26,7 +26,7 @@
 (deftest test-ack-process
   (testing "Happy Path"
     (let [input (a/chan 1)
-          ack-process (ack-process input 1 nil)
+          ack-process (->ack-process input 1 nil)
           output (a/chan 1) ;; Capture results sent to the msg broker
           send-result (partial result output)
           result-chan (a/chan 1)]
@@ -46,7 +46,7 @@
 
   (testing "Messages get the correct acknowledgement."
     (let [input (a/chan 1)
-          ack-process (ack-process input 1 nil)
+          ack-process (->ack-process input 1 nil)
           output (a/chan 1) ;; Capture results sent to the msg broker
           send-result (partial result output)
           result-chan1 (a/chan 1)
@@ -72,7 +72,7 @@
 
   (testing "All messages get ack'd even if ack input closes before worker result."
     (let [input (a/chan 1)
-          ack-process (ack-process input 1 nil)
+          ack-process (->ack-process input 1 nil)
           output (a/chan 1) ;; Capture results sent to the msg broker
           send-result (partial result output)
           result-chan (a/chan 1)]
@@ -96,7 +96,7 @@
 
   (testing "Ack process keeps working if there's an exception in WorkerResult."
     (let [input (a/chan 1)
-          ack-process (ack-process input 1 nil)
+          ack-process (->ack-process input 1 nil)
           output (a/chan 2) ;; Capture results sent to the msg broker
           send-result (partial result output)
           result-chan1 (a/chan 1)

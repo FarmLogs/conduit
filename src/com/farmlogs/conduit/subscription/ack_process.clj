@@ -36,7 +36,7 @@
                            :message-headers msg-headers})))
         (recur (a/<!! result-chan))))))
 
-(defn ack-process
+(defn ->ack-process
   "Given a core.async channel and an RMQ channel, start the message
   acknowledgement process. Return a channel that closes when the ack
   process terminates. The acknowledgement process can be shut down by
