@@ -61,7 +61,7 @@
   (start [this]
     (log/infof "Starting subscription on queue '%s'" (:queue-name queue-config))
     (let [rmq-chan (or rmq-chan (make-channel (:conn rmq-connection) queue-config))
-          new-messages (a/chan)
+          new-messages (a/chan buffer-size)
           pending-messages (a/chan buffer-size)
           ack-process (->ack-process new-messages buffer-size rmq-chan)
           cancelled? (promise)
