@@ -96,9 +96,6 @@
                (:queue-name queue-config))
     (rmq.basic/cancel rmq-chan consumer-tag)
 
-    ;; Wait until the server acknowledges the cancellation of our subscription
-    @cancelled?
-
     ;; Close pending-messages so we can drain it
     (a/close! pending-messages)
 
@@ -108,6 +105,9 @@
       (when-not (nil? unhandled-msg)
         (a/>!! result-chan :retry)
         (recur (a/<!! pending-messages))))
+
+    ;; Wait until the server acknowledges the cancellation of our subscription
+    @cancelled?
 
     ;; Let the ack-process know it can terminate
     (a/close! new-messages)
