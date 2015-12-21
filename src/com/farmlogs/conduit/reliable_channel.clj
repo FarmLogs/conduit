@@ -5,8 +5,7 @@
             [langohr
              [basic :as rmq.basic]
              [channel :as rmq.chan]])
-  (:import [com.rabbitmq.client ConfirmListener
-            Channel]))
+  (:import [com.rabbitmq.client ConfirmListener]))
 
 (defrecord Confirm [tag multiple? result])
 (defrecord Await [tag async-chan])
