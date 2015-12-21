@@ -6,5 +6,9 @@
     described by the message-metadata."))
 
 (defprotocol ReliablePublish
+  "Publish a message. Return a core.async chan that indicates if the
+  publication was successful.
+
+  The chan will yield one of #{:success :failure :timeout :closed}"
   (publish!
    [transport message headers]))

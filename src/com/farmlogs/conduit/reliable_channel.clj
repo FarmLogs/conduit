@@ -12,7 +12,7 @@
 (defrecord Await [tag async-chan])
 
 (defn handle-confirm
-  "Alert each Await that it's message has been confirmed.
+  "Alert each Await that its message has been confirmed.
 
    - awaits :: a sorted map of the form {<delivery-tag> <Await>}
    - confirmed-tag :: the tag being confirmed by the broker
