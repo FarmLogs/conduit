@@ -1,5 +1,6 @@
 (ns com.farmlogs.conduit.reliable-channel
   (:require [clojure.core.async :as a]
+            [clojure.tools.logging :as log]
             [com.farmlogs.conduit.protocols :as p]
             [langohr
              [basic :as rmq.basic]
@@ -72,16 +73,19 @@
   (let [timeouts (a/chan)
         handle-await (handle-await-fn timeouts timeout-window)]
     (a/go
-      (loop [awaiting (sorted-map)]
-        (recur
-         (a/alt!
-           confirms ([{:keys [tag multiple? result] :as confirm}]
-                     (handle-confirm awaiting tag multiple? result))
-           awaits ([{:keys [tag] :as await}]
-                   (assoc awaiting tag (handle-await await)))
-           timeouts ([tag]
-                     (handle-confirm awaiting tag false :timeout))
-           :priority true))))))
+      (try
+        (loop [awaiting (sorted-map)]
+          (recur
+           (a/alt!
+             confirms ([{:keys [tag multiple? result] :as confirm}]
+                       (handle-confirm awaiting tag multiple? result))
+             awaits ([{:keys [tag] :as await}]
+                     (assoc awaiting tag (handle-await await)))
+             timeouts ([tag]
+                       (handle-confirm awaiting tag false :timeout))
+             :priority true)))
+        (catch Throwable t
+          (log/error t "await-process terminating:"))))))
 
 (defn- ->confirm-listener
   [confirmation-chan]
