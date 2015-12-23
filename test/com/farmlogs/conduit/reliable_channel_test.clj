@@ -114,3 +114,36 @@
       :failure await2
       :success await3
       :timeout await4)))
+
+(deftest test-await-process-shutdown
+  (testing "Ensure messages get confirmed or timeout during the shutdown process."
+    (let [confirm-chan (a/chan)
+          await-chan (a/chan)
+          timeout-window 5
+          await-proc (->await-process confirm-chan await-chan timeout-window)
+
+          await1 (->Await 1 (a/chan 1))
+          await2 (->Await 2 (a/chan 1))
+          await3 (->Await 3 (a/chan 1))
+          await4 (->Await 4 (a/chan 1))
+
+          conf1 (->Confirm (:tag await1) false :success)
+          conf2 (->Confirm (:tag await2) false :failure)]
+
+      (doto await-chan
+        (a/>!! await1)
+        (a/>!! await2)
+        (a/>!! await3)
+        (a/>!! await4)
+        (a/close!))
+
+      (doto confirm-chan
+        (a/>!! conf1)
+        (a/>!! conf2))
+
+      (are [result await] (= result (a/<!! (:async-chan await)))
+
+        :success await1
+        :failure await2
+        :timeout await3
+        :timeout await4))))

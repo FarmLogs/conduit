@@ -107,7 +107,7 @@
 (defn- shutdown-process
   "Wait until all publications have been confirmed or timeout."
   [awaiting confirms timeouts]
-  (a/go-loop [awaiting (sorted-map)]
+  (a/go-loop [awaiting awaiting]
     (when-not (empty? awaiting)
       (a/alt!
         confirms ([{:keys [tag multiple? result] :as confirm}]
