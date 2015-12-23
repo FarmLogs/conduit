@@ -8,7 +8,10 @@
             [langohr
              [basic :as rmq.basic]
              [channel :as rmq.chan]])
-  (:import [com.rabbitmq.client ConfirmListener]))
+  (:import [com.rabbitmq.client
+            ConfirmListener
+            ReturnListener]
+           [java.util Base64]))
 
 (defrecord Confirm [tag multiple? result])
 (defrecord Await [tag async-chan])
@@ -131,6 +134,14 @@
           (a/<!)))))
 
 (defn- ->confirm-listener
+  "Listen for Confirm messages.
+
+   A message is Ack'd once the broker routes the message or determines
+  the message is unraoutable.
+
+   A message is Nack'd when the borker encounters an
+  exception (eg. out of memory or a disk failure) while trying to
+  route the message."
   [confirmation-chan]
   (reify ConfirmListener
     (handleAck [_ tag multiple?]
@@ -139,6 +150,27 @@
     (handleNack [_ tag multiple?]
       (a/>!! confirmation-chan
              (->Confirm tag multiple? :failure)))))
+
+(defn- ->return-listener
+  "Listen for Return messages, and indicate the message publication was a :failure.
+
+   A message is returned when the broker is unable to route the
+  message to a queue. If this happens there's probably a configuration
+  problem."
+  [confirmation-chan]
+  (reify ReturnListener
+    (handleReturn [_ reply-code reply-text exchange routing-key properties body]
+      (let [headers (-> properties (.getHeaders))]
+        (a/>!! confirmation-chan (->Confirm (get headers (str ::delivery-tag))
+                                            false
+                                            :failure))
+        (log/error "Returned publication:"
+                   (pr-str
+                    {:reply-code reply-code
+                     :reply-text reply-text
+                     :exchange exchange
+                     :routing-key routing-key
+                     :body (-> (Base64/getEncoder) (.encodeToString body))}))))))
 
 (defn ->reliable-chan
   "Return an implementation of the the ReliablePublish protocol."
@@ -149,6 +181,7 @@
         await-process (->await-process confirmation-chan await-chan timeout-window)]
     (doto rmq-chan
       (.addConfirmListener (->confirm-listener confirmation-chan))
+      (.addReturnListener (->return-listener confirmation-chan))
       (.confirmSelect))
     (reify
       p/ReliablePublish
@@ -162,7 +195,10 @@
                                    (:exchange headers)
                                    (:routing-key headers)
                                    message
-                                   headers))
+                                   (merge {:mandatory true
+                                           :persistent true
+                                           :headers {(str ::delivery-tag) next-tag}}
+                                          headers)))
               (do (a/put! async-chan :closed)
                   (a/close! async-chan))))
           async-chan))
@@ -174,4 +210,25 @@
         (locking rmq-chan
           (a/close! await-chan)
           (a/<!! await-process)
-          (.close rmq-chan))))))
+          (when (.isOpen rmq-chan)
+            (.close rmq-chan)))))))
+
+(comment
+  (do (require '[com.farmlogs.conduit.connection :as conn])
+      (require '[com.stuartsierra.component :as component])
+
+      (def system
+        (component/start-system
+         (component/system-map
+          :rmq (conn/connection "amqp://guest:guest@localhost"))))
+      (def reliable-chan (-> system :rmq :conn (->reliable-chan 1000))))
+
+
+
+  (a/<!! (p/publish! reliable-chan "hi!" {:exchange ""
+                                          :routing-key "test"}))
+
+  (.close reliable-chan)
+
+  (component/stop-system system)
+  )
