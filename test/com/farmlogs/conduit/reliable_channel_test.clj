@@ -10,7 +10,7 @@
     (let [confirm-chan (a/chan)
           await-chan (a/chan)
           timeout-window 5
-          await-proc (await-process confirm-chan await-chan timeout-window)
+          await-proc (->await-process confirm-chan await-chan timeout-window)
 
           await1 (->Await 1 (a/chan 1))
           await2 (->Await 2 (a/chan 1))
@@ -36,7 +36,7 @@
     (let [confirm-chan (a/chan)
           await-chan (a/chan)
           timeout-window 5
-          await-proc (await-process confirm-chan await-chan timeout-window)
+          await-proc (->await-process confirm-chan await-chan timeout-window)
 
           await1 (->Await 1 (a/chan 1))
           await2 (->Await 2 (a/chan 1))
@@ -60,7 +60,7 @@
     (let [confirm-chan (a/chan)
           await-chan (a/chan)
           timeout-window 5
-          await-proc (await-process confirm-chan await-chan timeout-window)
+          await-proc (->await-process confirm-chan await-chan timeout-window)
 
           await1 (->Await 1 (a/chan 1))
           await2 (->Await 2 (a/chan 1))
@@ -88,7 +88,7 @@
   (let [confirm-chan (a/chan)
         await-chan (a/chan)
         timeout-window 5
-        await-proc (await-process confirm-chan await-chan timeout-window)
+        await-proc (->await-process confirm-chan await-chan timeout-window)
 
         await1 (->Await 1 (a/chan 1))
         await2 (->Await 2 (a/chan 1))

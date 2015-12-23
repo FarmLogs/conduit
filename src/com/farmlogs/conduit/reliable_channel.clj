@@ -1,4 +1,7 @@
 (ns com.farmlogs.conduit.reliable-channel
+  "The reliable-chan that is returned by the ->reliable-chan function,
+  enables code that sends a message to be notified about whether the
+  message was successfully received by the message broker."
   (:require [clojure.core.async :as a]
             [clojure.tools.logging :as log]
             [com.farmlogs.conduit.protocols :as p]
@@ -11,12 +14,13 @@
 (defrecord Await [tag async-chan])
 
 (defn handle-confirm
-  "Alert each Await that its message has been confirmed.
+  "Alert each Await that its message has been confirmed and return a
+  map containing Awaits that haven't been alerted yet.
 
    - awaits :: a sorted map of the form {<delivery-tag> <Await>}
    - confirmed-tag :: the tag being confirmed by the broker
    - multiple? :: a boolean. if true, all tags <= confirmed tag are
-                  being confirmed
+                  being confirmed else just the confirmed-tag
    - result :: one of #{:success :failure :timeout} indicates whether
                the message was handled by the broker."
   [awaits confirmed-tag multiple? result]
@@ -67,24 +71,64 @@
           :priority true))
       (assoc await :async-chan handled))))
 
-(defn await-process
+(defn- await-process
+  "Handle the arrival of new Awaits and Confirms. When the awaits
+  channel is closed, return the map containing the Awaits that are
+  still pending."
+  [confirms awaits timeouts timeout-window]
+  (let [handle-await (handle-await-fn timeouts timeout-window)]
+    (a/go-loop [awaiting (sorted-map)]
+      (a/alt!
+        confirms ([{:keys [tag multiple? result] :as confirm}]
+                  (recur (try (handle-confirm awaiting tag multiple? result)
+                              (catch Throwable t
+                                (log/error t
+                                           "Error while handling confirm:"
+                                           (pr-str confirm))
+                                awaiting))))
+        awaits ([{:keys [tag] :as await}]
+                (if (nil? await)
+                  awaiting
+                  (recur (try (assoc awaiting tag (handle-await await))
+                              (catch Throwable t
+                                (log/error t "Error while handling await:"
+                                           (pr-str await))
+                                (a/>! (:async-chan await) :error)
+                                awaiting)))))
+        timeouts ([tag]
+                  (recur (try (handle-confirm awaiting tag false :timeout)
+                              (catch Throwable t
+                                (log/error t "Error while handling timeout:" tag)
+                                awaiting))))))))
+
+(defn- shutdown-process
+  "Wait until all publications have been confirmed or timeout."
+  [awaiting confirms timeouts]
+  (a/go-loop [awaiting (sorted-map)]
+    (when-not (empty? awaiting)
+      (a/alt!
+        confirms ([{:keys [tag multiple? result] :as confirm}]
+                  (recur (try (handle-confirm awaiting tag multiple? result)
+                              (catch Throwable t
+                                (log/error t
+                                           "Error while handling confirm:"
+                                           (pr-str confirm))
+                                awaiting))))
+        timeouts ([tag]
+                  (recur (try (handle-confirm awaiting tag false :timeout)
+                              (catch Throwable t
+                                (log/error t "Error while handling timeout:" tag)
+                                awaiting))))))))
+
+(defn ->await-process
   [confirms awaits timeout-window]
-  (let [timeouts (a/chan)
-        handle-await (handle-await-fn timeouts timeout-window)]
+  (let [timeouts (a/chan)]
     (a/go
-      (try
-        (loop [awaiting (sorted-map)]
-          (recur
-           (a/alt!
-             confirms ([{:keys [tag multiple? result] :as confirm}]
-                       (handle-confirm awaiting tag multiple? result))
-             awaits ([{:keys [tag] :as await}]
-                     (assoc awaiting tag (handle-await await)))
-             timeouts ([tag]
-                       (handle-confirm awaiting tag false :timeout))
-             :priority true)))
-        (catch Throwable t
-          (log/error t "await-process terminating:"))))))
+      ;; Run the await-process until the awaits channel is closed. At
+      ;; that point begin the shutdown process.
+      (-> (a/<! (await-process confirms awaits timeouts timeout-window))
+          (shutdown-process confirms timeouts)
+          (a/<!)))))
 
 (defn- ->confirm-listener
   [confirmation-chan]
@@ -97,11 +141,12 @@
              (->Confirm tag multiple? :failure)))))
 
 (defn ->reliable-chan
+  "Return an implementation of the the ReliablePublish protocol."
   [rmq-connection timeout-window]
   (let [rmq-chan (rmq.chan/open rmq-connection)
         confirmation-chan (a/chan)
-        await-chan (a/chan)]
-    (await-process confirmation-chan await-chan timeout-window)
+        await-chan (a/chan)
+        await-process (->await-process confirmation-chan await-chan timeout-window)]
     (doto rmq-chan
       (.addConfirmListener (->confirm-listener confirmation-chan))
       (.confirmSelect))
@@ -111,18 +156,22 @@
         (let [async-chan (a/chan 1)]
           (locking rmq-chan
             (if (.isOpen rmq-chan)
-              (let [msg-number (.getNextPublishSeqNo rmq-chan)]
-                (a/>!! await-chan (->Await msg-number async-chan))
+              (let [next-tag (.getNextPublishSeqNo rmq-chan)]
+                (a/>!! await-chan (->Await next-tag async-chan))
                 (rmq.basic/publish rmq-chan
                                    (:exchange headers)
                                    (:routing-key headers)
                                    message
                                    headers))
-              (a/put! async-chan :closed)))
+              (do (a/put! async-chan :closed)
+                  (a/close! async-chan))))
           async-chan))
 
       java.lang.AutoCloseable
       (close [_]
         ;; Acquire the lock, because we shouldn't close the
         ;; rmq-channel in the middle of trying to publish on it.
-        (locking rmq-chan (.close rmq-chan))))))
+        (locking rmq-chan
+          (a/close! await-chan)
+          (a/<!! await-process)
+          (.close rmq-chan))))))
