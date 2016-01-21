@@ -8,7 +8,37 @@ underlying messaging library.
 
 ## Usage
 
-### Production
+### Reliable Publishing
+
+Create a liable channel:
+
+```clojure
+(require '[com.farmlogs.conduit.connection :as conn])
+(require '[com.stuartsierra.component :as component])
+
+(def system
+  (component/start-system
+   (component/system-map
+    :rmq (conn/connection "amqp://guest:guest@localhost"))))
+(def reliable-chan (-> system :rmq :conn (->reliable-chan 1000)))
+```
+
+Publish using the channel:
+
+```clojure
+(a/<!! (p/publish! reliable-chan "hi!" {:exchange ""
+                                        :routing-key "test"}))
+```
+
+Close the channel by using `.close`
+
+```clojure
+(.close reliable-chan)
+```
+
+### Reliable Consumers
+
+#### Production
 
 ```clojure
 (require '[com.farmlogs.conduit.connection :as conn])
@@ -50,7 +80,7 @@ underlying messaging library.
         (component/start-system)))
 ```
 
-### Testing Your Workers Without RMQ
+#### Testing Your Workers Without RMQ
 
 ```clojure
 (extend-protocol component/Lifecycle
@@ -75,6 +105,3 @@ underlying messaging library.
 ## License
 
 Copyright © 2015 AgriSight, Inc
-
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
