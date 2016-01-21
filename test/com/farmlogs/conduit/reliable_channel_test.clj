@@ -9,7 +9,7 @@
   (testing "Happy path"
     (let [confirm-chan (a/chan)
           await-chan (a/chan)
-          timeout-window 5
+          timeout-window 50
           await-proc (->await-process confirm-chan await-chan timeout-window)
 
           await1 (->Await 1 (a/chan 1))
@@ -35,7 +35,7 @@
   (testing "Timeouts fire"
     (let [confirm-chan (a/chan)
           await-chan (a/chan)
-          timeout-window 5
+          timeout-window 50
           await-proc (->await-process confirm-chan await-chan timeout-window)
 
           await1 (->Await 1 (a/chan 1))
@@ -59,7 +59,7 @@
   (testing "We properly handle confirms with multiple? set to true."
     (let [confirm-chan (a/chan)
           await-chan (a/chan)
-          timeout-window 5
+          timeout-window 50
           await-proc (->await-process confirm-chan await-chan timeout-window)
 
           await1 (->Await 1 (a/chan 1))
@@ -87,7 +87,7 @@
 
   (let [confirm-chan (a/chan)
         await-chan (a/chan)
-        timeout-window 5
+        timeout-window 50
         await-proc (->await-process confirm-chan await-chan timeout-window)
 
         await1 (->Await 1 (a/chan 1))
@@ -119,7 +119,7 @@
   (testing "Ensure messages get confirmed or timeout during the shutdown process."
     (let [confirm-chan (a/chan)
           await-chan (a/chan)
-          timeout-window 5
+          timeout-window 50
           await-proc (->await-process confirm-chan await-chan timeout-window)
 
           await1 (->Await 1 (a/chan 1))
