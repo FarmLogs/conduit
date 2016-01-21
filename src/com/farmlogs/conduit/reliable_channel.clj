@@ -137,9 +137,9 @@
   "Listen for Confirm messages.
 
    A message is Ack'd once the broker routes the message or determines
-  the message is unraoutable.
+  the message is unroutable.
 
-   A message is Nack'd when the borker encounters an
+   A message is Nack'd when the broker encounters an
   exception (eg. out of memory or a disk failure) while trying to
   route the message."
   [confirmation-chan]
@@ -160,7 +160,7 @@
   [confirmation-chan]
   (reify ReturnListener
     (handleReturn [_ reply-code reply-text exchange routing-key properties body]
-      (let [headers (-> properties (.getHeaders))]
+      (let [headers (.getHeaders properties)]
         (a/>!! confirmation-chan (->Confirm (get headers (str ::delivery-tag))
                                             false
                                             :failure))
@@ -170,7 +170,7 @@
                      :reply-text reply-text
                      :exchange exchange
                      :routing-key routing-key
-                     :body (-> (Base64/getEncoder) (.encodeToString body))}))))))
+                     :body  (.encodeToString (Base64/getEncoder) body)}))))))
 
 (defn ->reliable-chan
   "Return an implementation of the the ReliablePublish protocol."
