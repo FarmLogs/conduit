@@ -6,6 +6,10 @@ A messaging library designed to:
 underlying messaging library.
 - enable reliable message publishing
 
+## Requirements
+
+- Java 1.8
+
 ## Usage
 
 ### Reliable Publishing
