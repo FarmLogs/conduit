@@ -39,7 +39,7 @@
 
       ;; Begin shutdown sequence for the ack-process
       (a/close! input)
-      (is (= [:ack :foo] (take-with-timeout output 10))
+      (is (= [:ack :foo] (take-with-timeout output 50))
           "We should ACK the :foo message.")
       (is (nil? (a/<!! ack-process))
           "The ack-process should be terminated")))
@@ -82,13 +82,13 @@
 
       ;; Begin shutdown sequence for the ack-process
       (a/close! input)
-      (is (= ::timeout (take-with-timeout ack-process 10))
+      (is (= ::timeout (take-with-timeout ack-process 50))
           "ack-process should still be running, b/c not all messages
           have been processed.")
 
       ;; Simulate the result of processing the message
       (a/>!! result-chan (send-result :ack))
-      (is (= [:ack :foo] (take-with-timeout output 10))
+      (is (= [:ack :foo] (take-with-timeout output 50))
           "We should ACK the :foo message.")
       (is (nil? (a/<!! ack-process))
           "Now that all messages have been processed, the ack-process
@@ -109,7 +109,7 @@
       ;; Begin shutdown sequence for the ack-process
       (a/close! input)
 
-      (is (= ::timeout (take-with-timeout ack-process 10))
+      (is (= ::timeout (take-with-timeout ack-process 50))
           "The ack-process should still be running, b/c there are
           unhandled messages.")
 

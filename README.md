@@ -1,4 +1,6 @@
-# com.farmlogs.conduit
+# Conduit
+
+![build status](https://travis-ci.org/FarmLogs/conduit.svg?branch=master)
 
 A messaging library designed to:
 
@@ -6,11 +8,19 @@ A messaging library designed to:
 underlying messaging library.
 - enable reliable message publishing
 
+## Requirements
+
+- Java 1.8
+
 ## Usage
+
+### Project.clj
+
+`[com.farmlogs.conduit "0.1.0"]`
 
 ### Reliable Publishing
 
-Create a liable channel:
+Create a reliable channel:
 
 ```clojure
 (require '[com.farmlogs.conduit.connection :as conn])
