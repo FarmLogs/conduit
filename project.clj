@@ -1,10 +1,11 @@
-(defproject com.farmlogs.conduit "0.1.0"
+(defproject com.farmlogs.conduit "0.1.1-SNAPSHOT"
   :description "Provides reliable publishing via RMQ."
   :license {:name "The MIT License (MIT)"
             :url "https://opensource.org/licenses/MIT"}
-  :dependencies [[org.clojure/clojure "1.7.0"]
-                 [com.novemberain/langohr "3.4.1"]
-                 [com.stuartsierra/component "0.3.0"]
+  :dependencies [[org.clojure/clojure "1.8.0"]
+                 [com.novemberain/langohr "3.5.1"]
+                 [metrics-clojure "2.6.1"]
+                 [com.stuartsierra/component "0.3.1"]
                  [org.clojure/core.async "0.2.374"]
                  [org.clojure/tools.logging "0.3.1"]]
 
