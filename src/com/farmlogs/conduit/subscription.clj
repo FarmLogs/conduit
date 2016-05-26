@@ -3,6 +3,7 @@
             [clojure.core.async :as a]
             [clojure.tools.logging :as log]
             [clojure.core.async.impl.protocols :as impl]
+            [com.farmlogs.conduit.protocols :as p]
             [com.farmlogs.conduit.subscription.ack-process :refer [->ack-process]]
             [com.farmlogs.conduit.payload :refer [read-payload]]
             [langohr
@@ -13,25 +14,38 @@
              [queue :as rmq.queue]])
   (:import [java.util Base64]))
 
+(extend-protocol p/WorkerResult
+  nil
+  (-respond! [_ transport msg]
+    (p/-respond! :drop transport msg))
+
+  Object
+  (-respond! [_ transport msg]
+    (p/-respond! :drop transport msg))
+
+  clojure.lang.Keyword
+  (-respond! [this transport {:keys [delivery-tag] :as msg}]
+    (case this
+      :ack (rmq.basic/ack transport delivery-tag)
+      :drop (rmq.basic/reject transport delivery-tag false)
+      :retry (rmq.basic/reject transport delivery-tag
+                         (not (:redelivery? msg))))))
+
 (defn ->handle-message-fn
-  [new-message-chan pending-messages-chan]
+  [pending-messages-chan]
   (fn [ch metadata ^bytes payload]
     (let [result-chan (a/chan 1)]
-      (if-not (a/>!! new-message-chan [result-chan metadata])
-        (log/error "Failed to put message onto new-message-chan"
-                   (pr-str {:payload (-> (Base64/getEncoder)
-                                         (.encodeToString payload))
-                            :headers metadata}))
-        (try (when-not (a/>!! pending-messages-chan
-                              [result-chan (read-payload (:content-type metadata) payload)])
-               (a/>!! result-chan :retry))
-             (catch Throwable t
-               (log/errorf t (str "Exception while enqueuing"
-                                  " new message: '%s' content-type: %s")
-                           (-> (Base64/getEncoder)
-                               (.encodeToString payload))
-                           (:content-type metadata))
-               (a/>!! result-chan :drop)))))))
+      (try (when-not (a/>!! @pending-messages-chan
+                            [result-chan (read-payload (:content-type metadata) payload)])
+             (p/-respond! :retry ch metadata))
+           (catch Throwable t
+             (log/errorf t (str "Exception while enqueuing"
+                                " new message: '%s' content-type: %s")
+                         (-> (Base64/getEncoder)
+                             (.encodeToString payload))
+                         (:content-type metadata))
+             (p/-respond! :drop ch metadata)))
+      (p/-respond! (a/<!! result-chan) ch metadata))))
 
 (defn consume-ok
   [{:keys [queue-name] :as config} consumer-tag]
@@ -61,15 +75,13 @@
   (start [this]
     (log/infof "Starting subscription on queue '%s'" (:queue-name queue-config))
     (let [rmq-chan (or rmq-chan (make-channel (:conn rmq-connection) queue-config))
-          new-messages (a/chan buffer-size)
-          pending-messages (a/chan buffer-size)
-          ack-process (->ack-process new-messages buffer-size rmq-chan)
+          pending-messages (atom (a/chan buffer-size))
           cancelled? (promise)
           rmq-consumer (rmq.consumer/create-default
                         rmq-chan
                         {:handle-consume-ok-fn (partial consume-ok queue-config)
                          :handle-cancel-ok-fn (partial cancel-ok cancelled? queue-config)
-                         :handle-delivery-fn (->handle-message-fn new-messages pending-messages)})
+                         :handle-delivery-fn (->handle-message-fn pending-messages)})
           consumer-tag (rmq.basic/consume rmq-chan (:queue-name queue-config) rmq-consumer)]
 
 
@@ -80,13 +92,11 @@
       (assoc this
              :rmq-chan rmq-chan
              :rmq-consumer rmq-consumer
-             :ack-process ack-process
-             :new-messages new-messages
              :pending-messages pending-messages
              :cancelled? cancelled?
              :consumer-tag consumer-tag)))
 
-  (stop [{:keys [cancelled? consumer-tag ack-process new-messages pending-messages] :as this}]
+  (stop [{:keys [cancelled? consumer-tag pending-messages] :as this}]
     ;; By the time this is called the com.stuartsierra.component
     ;; library has turned off the workers depending on this subscription.
 
@@ -97,23 +107,17 @@
     (rmq.basic/cancel rmq-chan consumer-tag)
 
     ;; Close pending-messages so we can drain it
-    (a/close! pending-messages)
+    (a/close! @pending-messages)
 
     ;; Drain pending-messages, telling the ack-process to :retry any
     ;; unhandled messages.
-    (loop [[result-chan :as unhandled-msg] (a/<!! pending-messages)]
+    (loop [[result-chan :as unhandled-msg] (a/<!! @pending-messages)]
       (when-not (nil? unhandled-msg)
         (a/>!! result-chan :retry)
-        (recur (a/<!! pending-messages))))
+        (recur (a/<!! @pending-messages))))
 
     ;; Wait until the server acknowledges the cancellation of our subscription
     @cancelled?
-
-    ;; Let the ack-process know it can terminate
-    (a/close! new-messages)
-
-    ;; wait for termination
-    (a/<!! ack-process)
 
     ;; All messages are drained. We can close the RMQ channel.
     (rmq.chan/close rmq-chan)
@@ -122,12 +126,12 @@
                       (:queue-name queue-config)))
 
     (dissoc this
-            :rmq-consumer :ack-process :new-messages :pending-messages
+            :rmq-consumer :pending-messages
             :cancelled? :consumer-tag))
 
   impl/ReadPort
   (take! [{:keys [pending-messages]} fn1-handler]
-    (impl/take! pending-messages fn1-handler)))
+    (impl/take! @pending-messages fn1-handler)))
 
 (def ^:static +queue-config-required-keys+
   #{:exchange-name :queue-name :exchange-type})

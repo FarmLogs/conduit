@@ -1,25 +1,10 @@
 (ns com.farmlogs.conduit.subscription.ack-process
   (:require [clojure.core.async :as a]
             [langohr.basic      :as rmq]
-            [com.farmlogs.conduit.protocols :as p]
+
             [clojure.tools.logging :as log]))
 
-(extend-protocol p/WorkerResult
-  nil
-  (-respond! [_ transport msg]
-    (p/-respond! :drop transport msg))
 
-  Object
-  (-respond! [_ transport msg]
-    (p/-respond! :drop transport msg))
-
-  clojure.lang.Keyword
-  (-respond! [this transport {:keys [delivery-tag] :as msg}]
-    (case this
-      :ack (rmq/ack transport delivery-tag)
-      :drop (rmq/reject transport delivery-tag false)
-      :retry (rmq/reject transport delivery-tag
-                         (not (:redelivery? msg))))))
 
 (defn ->responder
   "Given a transport and a result chan, start a thread that is
