@@ -44,7 +44,7 @@
                              (.encodeToString payload))
                          (:content-type metadata))
              (p/-respond! :drop ch metadata)))
-      (p/-respond! (a/<!! result-chan) ch metadata))))
+      (a/take! result-chan #(p/-respond! % ch metadata)))))
 
 (defn consume-ok
   [{:keys [queue-name] :as config} consumer-tag]
