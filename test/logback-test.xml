@@ -19,6 +19,6 @@
 
   <!-- For loggers in the these namespaces, log at all levels. -->
   <logger name="user" level="ALL" />
-  <logger name="com.farmlogs" level="ALL" />
+  <logger name="com.farmlogs" level="DEBUG" />
 
 </configuration>
