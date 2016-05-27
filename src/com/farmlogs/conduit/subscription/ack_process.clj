@@ -69,8 +69,10 @@
 
             ;; A result arrived
             :else
-            (do (a/>! io-chan [event (get pending chan)])
-                (recur (dissoc pending chan)))))
+            (do
+              (log/trace "acking:" (get-in pending [chan :delivery-tag]))
+              (a/>! io-chan [event (get pending chan)])
+              (recur (dissoc pending chan)))))
         (do
           ;; Shutdown responder thread.
           (a/close! io-chan)
