@@ -48,8 +48,9 @@
   (log/infof "Consumer tag: %s on queue: %s shutdown" consumer-tag queue-name))
 
 (defn- make-channel
-  [conn {:keys [exchange-name exchange-type] :as config}]
+  [conn prefetch-count {:keys [exchange-name exchange-type] :as config}]
   (let [chan (rmq.chan/open conn)]
+    (rmq.basic/qos chan prefetch-count)
     (rmq.exch/declare chan exchange-name exchange-type config)
     (rmq.queue/declare chan (:queue-name config) config)
     (rmq.queue/bind chan (:queue-name config) exchange-name config)
@@ -60,7 +61,7 @@
   component/Lifecycle
   (start [this]
     (log/infof "Starting subscription on queue '%s'" (:queue-name queue-config))
-    (let [rmq-chan (or rmq-chan (make-channel (:conn rmq-connection) queue-config))
+    (let [rmq-chan (or rmq-chan (make-channel (:conn rmq-connection) buffer-size  queue-config))
           new-messages (a/chan buffer-size)
           pending-messages (a/chan buffer-size)
           ack-process (->ack-process new-messages buffer-size rmq-chan)
