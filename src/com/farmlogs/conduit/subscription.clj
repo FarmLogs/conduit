@@ -4,7 +4,6 @@
             [clojure.tools.logging :as log]
             [clojure.core.async.impl.protocols :as impl]
             [com.farmlogs.conduit.protocols :as p]
-            [com.farmlogs.conduit.subscription.ack-process :refer [->ack-process]]
             [com.farmlogs.conduit.payload :refer [read-payload]]
             [langohr
              [basic :as rmq.basic]
@@ -111,13 +110,16 @@
 
     ;; Drain pending-messages, telling the ack-process to :retry any
     ;; unhandled messages.
+    (log/debug "draining pending")
     (loop [[result-chan :as unhandled-msg] (a/<!! @pending-messages)]
       (when-not (nil? unhandled-msg)
         (a/>!! result-chan :retry)
         (recur (a/<!! @pending-messages))))
+    (log/debug "done draining")
 
-    ;; Wait until the server acknowledges the cancellation of our subscription
-    @cancelled?
+    (if (deref cancelled? 5000 false)
+      (log/debug "consumer cancel acknowledged")
+      (log/debug "consumer cancel acknowledgement timeout"))
 
     ;; All messages are drained. We can close the RMQ channel.
     (rmq.chan/close rmq-chan)
