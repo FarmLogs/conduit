@@ -4,6 +4,7 @@
   message was successfully received by the message broker."
   (:require [clojure.core.async :as a]
             [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as component]
             [com.farmlogs.conduit.protocols :as p]
             [langohr
              [basic :as rmq.basic]
@@ -172,46 +173,68 @@
                      :routing-key routing-key
                      :body  (.encodeToString (Base64/getEncoder) body)}))))))
 
-(defn ->reliable-chan
-  "Return an implementation of the the ReliablePublish protocol."
-  [rmq-connection timeout-window]
-  (let [rmq-chan (rmq.chan/open rmq-connection)
-        confirmation-chan (a/chan)
-        await-chan (a/chan)
-        await-process (->await-process confirmation-chan await-chan timeout-window)]
-    (doto rmq-chan
-      (.addConfirmListener (->confirm-listener confirmation-chan))
-      (.addReturnListener (->return-listener confirmation-chan))
-      (.confirmSelect))
-    (reify
-      p/ReliablePublish
-      (publish! [_ message headers]
-        (let [async-chan (a/chan 1)]
-          (locking rmq-chan
-            (if (.isOpen rmq-chan)
-              (let [next-tag (.getNextPublishSeqNo rmq-chan)]
-                (a/>!! await-chan (->Await next-tag async-chan))
-                (rmq.basic/publish rmq-chan
-                                   (:exchange headers)
-                                   (:routing-key headers)
-                                   message
-                                   (merge {:mandatory true
-                                           :persistent true
-                                           :headers {(str ::delivery-tag) next-tag}}
-                                          headers)))
-              (do (a/put! async-chan :closed)
-                  (a/close! async-chan))))
-          async-chan))
+(defrecord ReliableChan
+    [await-chan await-process rmq-chan]
+  java.lang.AutoCloseable
+  (close [_]
+    ;; Acquire the lock, because we shouldn't close the
+    ;; rmq-channel in the middle of trying to publish on it.
+    (locking rmq-chan
+      (a/close! await-chan)
+      (a/<!! await-process)
+      (when (.isOpen rmq-chan)
+        (.close rmq-chan))))
 
-      java.lang.AutoCloseable
-      (close [_]
-        ;; Acquire the lock, because we shouldn't close the
-        ;; rmq-channel in the middle of trying to publish on it.
-        (locking rmq-chan
-          (a/close! await-chan)
-          (a/<!! await-process)
-          (when (.isOpen rmq-chan)
-            (.close rmq-chan)))))))
+  component/Lifecycle
+  (start [{:keys [rmq-connection timeout-window] :as this}]
+    (let [rmq-chan (rmq.chan/open rmq-connection)
+          confirmation-chan (a/chan)
+          await-chan (a/chan)
+          await-process (->await-process confirmation-chan await-chan timeout-window)]
+      (doto rmq-chan
+        (.addConfirmListener (->confirm-listener confirmation-chan))
+        (.addReturnListener (->return-listener confirmation-chan))
+        (.confirmSelect))
+      (assoc this
+             :await-chan await-chan
+             :await-process await-process
+             :rmq-chan rmq-chan)))
+  (stop [this]
+    (when (and rmq-chan (rmq.chan/open? rmq-chan))
+      (.close this))
+    (assoc this
+           :await-chan nil
+           :await-process nil
+           :rmq-chan nil))
+
+  p/ReliablePublish
+  (publish! [_ message headers]
+    (let [async-chan (a/chan 1)]
+      (locking rmq-chan
+        (if (.isOpen rmq-chan)
+          (let [next-tag (.getNextPublishSeqNo rmq-chan)]
+            (a/>!! await-chan (->Await next-tag async-chan))
+            (rmq.basic/publish rmq-chan
+                               (:exchange headers)
+                               (:routing-key headers)
+                               message
+                               (merge {:mandatory true
+                                       :persistent true
+                                       :headers {(str ::delivery-tag) next-tag}}
+                                      headers)))
+          (do (a/put! async-chan :closed)
+              (a/close! async-chan))))
+      async-chan))
+  (publish!! [this message headers]
+    (a/<!! (p/publish! this message headers))))
+
+
+(defn ->reliable-chan
+  "Return an unstarted ReliableChannel."
+  ([timeout-window]
+   (map->ReliableChan {:timeout-window timeout-window}))
+  ([rmq-connection timeout-window]
+   (map->ReliableChan {:rmq-connection rmq-connection :timeout-window timeout-window})))
 
 (comment
   (do (require '[com.farmlogs.conduit.connection :as conn])

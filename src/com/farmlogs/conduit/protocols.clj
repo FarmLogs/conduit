@@ -6,15 +6,25 @@
     described by the message-metadata."))
 
 (defprotocol ReliablePublish
-  "Publish a message. Return a core.async chan that indicates if the
-  publication was successful.
-
-  Headers must contain the following keys:
-
-   - exchange :: The name of the exchange to publish to.
-   - routing-key :: The topic or queue name that this message should
-                    be routed to.
-
-  The chan will yield one of #{:success :failure :timeout :closed :error}"
   (publish!
-   [transport message headers]))
+    [transport message headers]
+    "Publish a message. Return a core.async chan that indicates if the
+     publication was successful.
+
+     Headers must contain the following keys:
+
+      - exchange :: The name of the exchange to publish to.
+      - routing-key :: The topic or queue name that this message should
+                       be routed to.
+
+     The chan will yield one of #{:success :failure :timeout :closed :error}")
+  (publish!! [transport message headers]
+    "Publish a message. Return one of:
+          #{:success :failure :timeout :closed :error}
+     indicating if the publication was successful.
+
+     Headers must contain the following keys:
+
+      - exchange :: The name of the exchange to publish to.
+      - routing-key :: The topic or queue name that this message should
+                       be routed to."))
