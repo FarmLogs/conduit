@@ -8,9 +8,7 @@
             [langohr
              [basic :as rmq.basic]
              [channel :as rmq.chan]
-             [consumers :as rmq.consumer]
-             [exchange :as rmq.exch]
-             [queue :as rmq.queue]])
+             [consumers :as rmq.consumer]])
   (:import [java.util Base64]))
 
 (defn ->handle-message-fn
@@ -34,49 +32,45 @@
                (a/>!! result-chan :drop)))))))
 
 (defn consume-ok
-  [{:keys [queue-name] :as config} consumer-tag]
+  [queue-name consumer-tag]
   (log/infof "Consuming %s with tag %s" queue-name consumer-tag))
 
 (defn cancel
-  [cancelled-promise {:keys [queue-name] :as queue-config} consumer-tag]
+  [cancelled-promise queue-name consumer-tag]
   (deliver cancelled-promise true)
   (log/warnf "Cancelled consumer tag: %s on queue: %s" consumer-tag queue-name))
 
 (defn cancel-ok
-  [cancelled-promise {:keys [queue-name] :as queue-config} consumer-tag]
+  [cancelled-promise queue-name consumer-tag]
   (deliver cancelled-promise true)
   (log/infof "Consumer tag: %s on queue: %s shutdown" consumer-tag queue-name))
 
 (defn- make-channel
-  [conn prefetch-count {:keys [exchange-name exchange-type] :as config}]
-  (let [chan (rmq.chan/open conn)]
-    (rmq.basic/qos chan prefetch-count)
-    (rmq.exch/declare chan exchange-name exchange-type config)
-    (rmq.queue/declare chan (:queue-name config) config)
-    (rmq.queue/bind chan (:queue-name config) exchange-name config)
-    chan))
+  [conn prefetch-count]
+  (doto (rmq.chan/open conn)
+    (rmq.basic/qos prefetch-count)))
 
 (defrecord Subscription
-    [rmq-connection rmq-chan queue-config buffer-size]
+    [rmq-connection rmq-chan queue-name buffer-size]
   component/Lifecycle
   (start [this]
-    (log/infof "Starting subscription on queue '%s'" (:queue-name queue-config))
-    (let [rmq-chan (or rmq-chan (make-channel (:conn rmq-connection) buffer-size  queue-config))
+    (log/infof "Starting subscription on queue '%s'" queue-name)
+    (let [rmq-chan (or rmq-chan (make-channel (:conn rmq-connection) buffer-size))
           new-messages (a/chan buffer-size)
           pending-messages (a/chan buffer-size)
           ack-process (->ack-process new-messages buffer-size rmq-chan)
           cancelled? (promise)
           rmq-consumer (rmq.consumer/create-default
                         rmq-chan
-                        {:handle-consume-ok-fn (partial consume-ok queue-config)
-                         :handle-cancel-ok-fn (partial cancel-ok cancelled? queue-config)
+                        {:handle-consume-ok-fn (partial consume-ok queue-name)
+                         :handle-cancel-ok-fn (partial cancel-ok cancelled? queue-name)
                          :handle-delivery-fn (->handle-message-fn new-messages pending-messages)})
-          consumer-tag (rmq.basic/consume rmq-chan (:queue-name queue-config) rmq-consumer)]
+          consumer-tag (rmq.basic/consume rmq-chan queue-name rmq-consumer)]
 
 
 
       (log/infof "Started subscription on queue '%s' with tag '%s'"
-                 (:queue-name queue-config)
+                 queue-name
                  consumer-tag)
       (assoc this
              :rmq-chan rmq-chan
@@ -94,7 +88,7 @@
     ;; Shut down the RMQ consumer, so we don't get any more messages delivered
     (log/infof "Shutting down subscription '%s' on queue '%s'"
                consumer-tag
-               (:queue-name queue-config))
+               queue-name)
     (rmq.basic/cancel rmq-chan consumer-tag)
 
     ;; Close pending-messages so we can drain it
@@ -120,7 +114,7 @@
     (rmq.chan/close rmq-chan)
     (log/info (format "Shut down subscription '%s' on queue '%s'"
                       consumer-tag
-                      (:queue-name queue-config)))
+                      queue-name))
 
     (dissoc this
             :rmq-consumer :ack-process :new-messages :pending-messages
@@ -134,13 +128,9 @@
   #{:exchange-name :queue-name :exchange-type})
 
 (defn subscription
-  ([queue-config buffer-size]
-   (subscription nil queue-config buffer-size))
-  ([rmq-chan queue-config buffer-size]
-   (assert (clojure.set/subset? +queue-config-required-keys+
-                                queue-config))
+  ([queue-name buffer-size]
+   (subscription nil queue-name buffer-size))
+  ([rmq-chan queue-name buffer-size]
    (assert (number? buffer-size))
-   (when (= "topic" (:exchange-type queue-config))
-     (assert (not (nil? (:routing-key queue-config)))))
 
-   (->Subscription nil rmq-chan queue-config buffer-size)))
+   (->Subscription nil rmq-chan queue-name buffer-size)))

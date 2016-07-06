@@ -1,4 +1,4 @@
-(defproject com.farmlogs.conduit "0.1.1"
+(defproject com.farmlogs.conduit "0.2.0"
   :description "Provides reliable publishing via RMQ."
   :license {:name "The MIT License (MIT)"
             :url "https://opensource.org/licenses/MIT"}
@@ -14,4 +14,8 @@
                     [org.slf4j/jul-to-slf4j "1.7.7"]
                     [org.slf4j/jcl-over-slf4j "1.7.7"]
                     [org.slf4j/log4j-over-slf4j "1.7.7"]
-                    [criterium "0.4.3"]]}})
+                    [criterium "0.4.3"]]}}
+  :repositories {"farmlogs-internal"
+                 {:url "s3p://fl-maven-repo/mvn"
+                  :username ~(System/getenv "AMAZON_KEY")
+                  :passphrase ~(System/getenv "AMAZON_SECRET")}})
