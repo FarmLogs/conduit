@@ -187,7 +187,7 @@
 
   component/Lifecycle
   (start [{:keys [rmq-connection timeout-window] :as this}]
-    (let [rmq-chan (rmq.chan/open rmq-connection)
+    (let [rmq-chan (rmq.chan/open (:conn rmq-connection))
           confirmation-chan (a/chan)
           await-chan (a/chan)
           await-process (->await-process confirmation-chan await-chan timeout-window)]
