@@ -173,6 +173,10 @@
                      :routing-key routing-key
                      :body  (.encodeToString (Base64/getEncoder) body)}))))))
 
+(extend-type com.rabbitmq.client.Connection
+  p/RMQConnection
+  (connection [this] this))
+
 (defrecord ReliableChan
     [await-chan await-process rmq-chan]
   java.lang.AutoCloseable
@@ -187,7 +191,7 @@
 
   component/Lifecycle
   (start [{:keys [rmq-connection timeout-window] :as this}]
-    (let [rmq-chan (rmq.chan/open (:conn rmq-connection))
+    (let [rmq-chan (rmq.chan/open (p/connection rmq-connection))
           confirmation-chan (a/chan)
           await-chan (a/chan)
           await-process (->await-process confirmation-chan await-chan timeout-window)]

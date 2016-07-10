@@ -28,3 +28,7 @@
       - exchange :: The name of the exchange to publish to.
       - routing-key :: The topic or queue name that this message should
                        be routed to."))
+
+(defprotocol RMQConnection
+  "Return an com.rabbitmq.client.Connection."
+  (connection [this]))
