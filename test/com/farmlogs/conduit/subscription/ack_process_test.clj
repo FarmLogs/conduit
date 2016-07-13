@@ -95,31 +95,32 @@
           should be terminated.")))
 
   (testing "Ack process keeps working if there's an exception in WorkerResult."
-    (let [input (a/chan 1)
-          ack-process (->ack-process input 1 nil)
-          output (a/chan 2) ;; Capture results sent to the msg broker
-          send-result (partial result output)
-          result-chan1 (a/chan 1)
-          result-chan2 (a/chan 1)]
+    (with-redefs [clojure.tools.logging/log* (constantly :no-op)]
+      (let [input (a/chan 1)
+           ack-process (->ack-process input 1 nil)
+           output (a/chan 2) ;; Capture results sent to the msg broker
+           send-result (partial result output)
+           result-chan1 (a/chan 1)
+           result-chan2 (a/chan 1)]
 
-      ;; Simulate the arrival of 2 messages
-      (a/>!! input [result-chan1 :foo])
-      (a/>!! input [result-chan2 :bar])
+       ;; Simulate the arrival of 2 messages
+       (a/>!! input [result-chan1 :foo])
+       (a/>!! input [result-chan2 :bar])
 
-      ;; Begin shutdown sequence for the ack-process
-      (a/close! input)
+       ;; Begin shutdown sequence for the ack-process
+       (a/close! input)
 
-      (is (= ::timeout (take-with-timeout ack-process 50))
-          "The ack-process should still be running, b/c there are
+       (is (= ::timeout (take-with-timeout ack-process 50))
+           "The ack-process should still be running, b/c there are
           unhandled messages.")
 
-      ;; Simulate a worker returning some sort of unexpected result.
-      (a/>!! result-chan2 (broken-result))
+       ;; Simulate a worker returning some sort of unexpected result.
+       (a/>!! result-chan2 (broken-result))
 
-      ;; Simulate a worker :ack'ing :foo
-      (a/>!! result-chan1 (send-result :ack))
-      (is (nil? (a/<!! ack-process))
-          "ack-process should be termainated.")
-      (a/close! output)
-      (is (= #{[:ack :foo]} (a/<!! (a/into #{} output)))
-          "The :foo message should be ACK'd."))))
+       ;; Simulate a worker :ack'ing :foo
+       (a/>!! result-chan1 (send-result :ack))
+       (is (nil? (a/<!! ack-process))
+           "ack-process should be termainated.")
+       (a/close! output)
+       (is (= #{[:ack :foo]} (a/<!! (a/into #{} output)))
+           "The :foo message should be ACK'd.")))))
