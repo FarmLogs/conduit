@@ -1,4 +1,4 @@
-(defproject com.farmlogs.conduit "0.2.1-SNAPSHOT"
+(defproject com.farmlogs.conduit "0.2.0-SNAPSHOT"
   :description "Provides reliable publishing via RMQ."
   :license {:name "The MIT License (MIT)"
             :url "https://opensource.org/licenses/MIT"}
