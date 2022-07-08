@@ -12,6 +12,11 @@ underlying messaging library.
 
 - Java 1.8
 
+## pre-commit
+
+- Install: https://pre-commit.com/
+- running locally: This will also happen automatically before committing to a branch, but you can also run the tasks with `pre-commit run --all-files`
+
 ## Usage
 
 ### Project.clj
